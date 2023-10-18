@@ -1,0 +1,125 @@
+---
+title: "Food Trucks"
+author: "Maroova Elkemary"
+date: "10/16/2023"
+output:
+  pdf_document: default
+  html_document: default
+editor_options:
+  chunk_output_type: console
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+# Load necessary packages
+library(httr)
+library(jsonlite)
+library(dplyr)
+library(stringr)
+
+# Define the Google Places API endpoint and the API key
+google_places_endpoint <- "https://maps.googleapis.com/maps/api/place/textsearch/json"
+api_key <- "AIzaSyCeimMmbURZUZ3l7tG-LRH1AKk8t1smsqk"
+
+# Query the API for food trucks in Indianapolis
+response <- GET(google_places_endpoint, query = list(
+  query = "food truck in Indianapolis",
+  key = api_key))
+
+# Parse the response into 'data'
+data <- fromJSON(content(response, "text"))
+
+# Extract data
+food_trucks <- data.frame(
+  name = data$results$name,
+  address = data$results$formatted_address,
+  rating = data$results$rating)
+  
+
+# Add the cuisine column
+food_trucks <- food_trucks %>%
+  mutate(
+    cuisine = case_when(
+      str_detect(tolower(name), "taco") ~ "Taco",
+      str_detect(tolower(name), "gyros") ~ "Gyros",
+      str_detect(tolower(name), "venezolano") ~ "Venezuelan",
+      str_detect(tolower(name), "latin") ~ "Latin",
+      str_detect(tolower(name), "pico de gallo") ~ "Mexican",
+      str_detect(tolower(name), "burger|american") ~ "American",
+      str_detect(tolower(name), "hot dog") ~ "Hot Dog",
+      str_detect(tolower(name), "el ") ~ "Mexican",
+      str_detect(tolower(name), "mi ") ~ "Mexican",
+      str_detect(tolower(name), "la ") ~ "Mexican",
+      str_detect(tolower(name), "mil ") ~ "Mexican",
+      TRUE ~ NA_character_
+    )
+  )
+
+print(food_trucks)
+
+```
+
+```{r}
+# Create a xlsx file for the data
+
+writexl::write_xlsx(food_trucks, "food_trucks.xlsx")
+```
+
+```{r}
+# Select the 5 best rated food trucks
+
+selected_trucks <- food_trucks %>%
+  arrange(-rating) %>%
+  slice_max(rating, n = 5)
+
+selected_trucks %>%
+  select(name, rating, cuisine)
+```
+
+
+
+
+```{r}
+distance_matrix_endpoint <- "https://maps.googleapis.com/maps/api/distancematrix/json"
+
+# Create a string of addresses for the API request
+addresses <- paste(selected_trucks$address, collapse = "|")
+
+# Query the API for distances between the selected food trucks
+response <- GET(distance_matrix_endpoint, query = list(
+  origins = addresses,
+  destinations = addresses,
+  key = api_key
+))
+
+# Parse the response
+data <- fromJSON(content(response, "text"))
+
+# Distance values extracted from the provided data
+distances <- c(1, 35.4, 12.0, 16.7, 22.9,
+               34.7, 1, 20.5, 25.0, 14.0,
+               11.9, 21.6, 1, 8.8, 9.1,
+               18.8, 22.9, 9.6, 1, 10.4,
+               15.6, 14.2, 4.4, 8.0, 1)
+
+# Create a matrix from the distances
+distance_matrix <- matrix(distances, nrow=5, byrow=TRUE)
+
+# Assign row and column names to the matrix
+rownames(distance_matrix) <- c("8522 Madison Ave", "7085 N Michigan Rd", "S Meridian St", "5210 English Ave", "729 N Pennsylvania St")
+colnames(distance_matrix) <- c("8522 Madison Ave", "7085 N Michigan Rd", "S Meridian St", "5210 English Ave", "729 N Pennsylvania St")
+
+# Print the matrix
+print(distance_matrix)
+```
+
+
+
+
+
+
+
+
